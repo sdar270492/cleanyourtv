@@ -151,6 +151,10 @@
          still opens on a tap; "hold:scan:490:..." works for scancodes. A key with only a hold entry does nothing
          on a tap. A listed app that is not installed leaves the button doing nothing. Leave empty to omit. -->
     <string-array name="app_keys" translatable="false">
+        <!-- Blackline R3GS remote: launcherx handles these, but Android 14 blocks its background launch
+             once this launcher is Home, so HomeKeyService opens them itself. -->
+        <item>KEYCODE_BUTTON_3:com.google.android.youtube.tv</item>
+        <item>KEYCODE_BUTTON_4:com.netflix.ninja</item>
     </string-array>
 
     <!-- Package of the stock launcher, for TVs whose firmware turns it back on after it was disabled. XGIMI's
