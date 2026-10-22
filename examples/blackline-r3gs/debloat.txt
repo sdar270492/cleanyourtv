@@ -1,0 +1,27 @@
+# Blackline R3GS (device R3GS, made by MOKA), Google TV on Android 14, firmware UKR1.260130.001, Peru
+# Realtek RTD2841A (board rt2841a), ~0.9 GB RAM. Same platform as examples/kalley-43g200.
+#
+# Apply:   TV_HOST=<tv ip> tools/disable.sh examples/blackline-r3gs/debloat.txt
+# Undo:    TV_HOST=<tv ip> tools/restore.sh examples/blackline-r3gs/debloat.txt
+# Do NOT disable launcherx or setupwraith (see kalley-43g200: boot loop). Here the saved Wi-Fi belongs to setupwraith.
+# Assistant, Chromecast, FastCast/SCast, YouTube Music, Netflix kept by choice.
+# Come back enabled at every boot, so not listed: com.google.android.feedback, com.google.android.play.games.
+# Reboot-checked 2026-10-21: Home, Wi-Fi, ADB and AdGuard Private DNS OK.
+
+# Telemetry
+com.android.tv.feedbackconsent
+
+# Android ad and personalisation services
+com.android.adservices.api
+com.android.ondevicepersonalization.services
+com.android.federatedcompute.services
+
+# Manufacturer content and auto-installs
+com.realtek.leanbacklauncher.partnercustomizer # injects apps and rows into the home screen
+android.autoinstalls.config.google.gtvpai      # partner auto-installs
+com.seraphic.media.tv.interactive.app          # HbbTV interactive app (unused with ISDB-T)
+
+# Not needed on a TV
+com.android.healthconnect.controller
+com.android.health.connect.backuprestore
+com.apps.wifihotspot

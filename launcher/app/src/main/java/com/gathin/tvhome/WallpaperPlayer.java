@@ -1,7 +1,10 @@
 package com.gathin.tvhome;
 
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -17,6 +20,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -49,7 +53,7 @@ final class WallpaperPlayer {
     private String displayed = "";
     /** wallpaper_captions: the shown picture's name from wallpapers/captions.txt; null when off or there are none. */
     private final TextView caption;
-    private final Map<String, String> names;
+    private Map<String, String> names;
 
     WallpaperPlayer(Context context, FrameLayout root, Config config) {
         this.root = root;
@@ -116,6 +120,52 @@ final class WallpaperPlayer {
         update();
     }
 
+    /** The caption, when it names a YouTube video that OK can open; null otherwise (focus skips it). */
+    View focusableCaption() {
+        return caption != null && caption.getAlpha() > 0f && videoId() != null ? caption : null;
+    }
+
+    /** Up, Down and the sides on the caption: MainActivity sends them back to the top bar and the dock. */
+    void setCaptionKeys(View.OnKeyListener keys) {
+        if (caption == null) return;
+        caption.setOnKeyListener(keys);
+        caption.setOnClickListener(v -> {
+            String id = videoId();
+            if (id == null) return;
+            Intent watch = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + id))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                v.getContext().startActivity(new Intent(watch).setPackage("com.google.android.youtube.tv"));
+            } catch (ActivityNotFoundException noYouTube) {
+                try {
+                    v.getContext().startActivity(watch);
+                } catch (ActivityNotFoundException ignored) {
+                    // nothing on this TV opens YouTube links
+                }
+            }
+        });
+    }
+
+    /** The video behind the displayed yt-NN.jpg, from yt-ids.txt (YouTubeWallpapers); null for other pictures. */
+    private String videoId() {
+        if (displayed == null || !displayed.matches("yt-\\d\\d\\.jpg") || files.isEmpty()) return null;
+        try {
+            List<String> ids = java.nio.file.Files.readAllLines(
+                    new File(files.get(0).getParentFile(), "yt-ids.txt").toPath(), StandardCharsets.UTF_8);
+            int index = Integer.parseInt(displayed.substring(3, 5));
+            return index < ids.size() && ids.get(index).trim().length() == 11 ? ids.get(index).trim() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** captions.txt was rewritten under the same filenames (YouTubeWallpapers): read the names again. */
+    void reloadCaptions() {
+        if (caption == null || files.isEmpty()) return;
+        names = WallpaperCaptions.read(files.get(0).getParentFile());
+        showCaption(false);
+    }
+
     void stop() {
         active = false;
     }
@@ -175,7 +225,16 @@ final class WallpaperPlayer {
         text.setSingleLine(true);
         text.setEllipsize(TextUtils.TruncateAt.END);
         text.setMaxWidth(Math.round(520 * dp));
-        text.setFocusable(false);
+        // Focusable from the top bar (YouTube collections): a glass pill on focus, OK opens the video.
+        text.setFocusable(true);
+        int padH = Math.round(12 * dp), padV = Math.round(5 * dp);
+        text.setPadding(padH, padV, padH, padV);
+        android.graphics.drawable.GradientDrawable pill = new android.graphics.drawable.GradientDrawable();
+        pill.setColor(0x40FFFFFF);
+        pill.setCornerRadius(18 * dp);
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_focused}, pill);
+        text.setBackground(states);
         text.setAlpha(0f);
         try {
             text.setTypeface(context.getResources().getFont(R.font.outfit_regular));
@@ -185,7 +244,7 @@ final class WallpaperPlayer {
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END);
         params.topMargin = Math.round(110 * dp);
-        params.setMarginEnd(Math.round(62 * dp));
+        params.setMarginEnd(Math.round(50 * dp));   // 62dp minus the pill's padding, so the text lines up as before
         root.addView(text, params);
         return text;
     }

@@ -1,0 +1,9 @@
+{
+  "wallpaper": true,
+  "wallpaper_rotation_minutes": 3,
+  "wallpaper_order": "sequential",
+  "wallpaper_captions": true,
+  "wallpaper_dim": 50,
+  "dock_glass": true,
+  "app_glow": true
+}

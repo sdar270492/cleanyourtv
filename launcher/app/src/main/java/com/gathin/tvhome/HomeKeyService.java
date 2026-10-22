@@ -1,11 +1,13 @@
 package com.gathin.tvhome;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.SystemClock;
 import android.os.UserManager;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -101,6 +103,17 @@ public class HomeKeyService extends AccessibilityService {
             for (ResolveInfo ri : getPackageManager().queryIntentActivities(home, PackageManager.MATCH_DISABLED_COMPONENTS)) {
                 stockHome.add(ri.activityInfo.name);
             }
+            // home_key_service.xml declares no event types, so ask for window changes only when redirecting.
+            AccessibilityServiceInfo info = getServiceInfo();
+            if (info != null && !stockHome.isEmpty()) {
+                info.eventTypes |= AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
+                setServiceInfo(info);
+            }
+            // At boot the stock home is already up before this service binds, so its window event was missed.
+            if (!stockHome.isEmpty() && SystemClock.elapsedRealtime() < 5 * 60 * 1000) {
+                startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(getPackageName())
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+            }
         }
         holdAppKeys = RemoteKeys.parseHoldAppKeys(config.appKeys);
         holdAppScancodes = RemoteKeys.parseHoldAppScancodes(config.appKeys);
@@ -133,7 +146,10 @@ public class HomeKeyService extends AccessibilityService {
         }
         if (RemoteKeys.handle(this, event, appKeys.get(event.getKeyCode()),
                 holdAppKeys.get(event.getKeyCode()))) return true;
-        if (event.getKeyCode() != KeyEvent.KEYCODE_ALL_APPS) return false;
+        // With stock_home_redirect the stock launcher still owns Home (Google TV keeps it), so take HOME too.
+        boolean homeKey = event.getKeyCode() == KeyEvent.KEYCODE_ALL_APPS
+                || (!stockHome.isEmpty() && event.getKeyCode() == KeyEvent.KEYCODE_HOME);
+        if (!homeKey) return false;
         if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) {
             Intent home = new Intent(Intent.ACTION_MAIN)
                     .addCategory(Intent.CATEGORY_HOME)
