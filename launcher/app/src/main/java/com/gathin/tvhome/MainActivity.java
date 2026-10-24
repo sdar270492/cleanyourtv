@@ -64,6 +64,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
+import android.widget.TextClock;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -108,7 +109,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private String liveTvPkg;
     /** Idle time on Home before ClockActivity; 0 is off (config.xml, home_idle_clock_minutes). */
     private long idleClockMs;
-    private final Runnable showIdleClock = () -> startActivity(new Intent(this, ClockActivity.class));
+    private final Runnable showIdleClock = () -> startActivity(new Intent(this,
+            this.videoWall != null ? LandscapeActivity.class : ClockActivity.class));
+    /** video_wall: Back twice within this time on Home opens the Paisajes screensaver, as Google TV's Back did. */
+    private static final long DOUBLE_BACK_MS = 1500;
+    private long lastBackAt;
     private String liveTvAction;
     private String liveTvInputId;
     private String inputAction;
@@ -122,6 +127,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private RecyclerView grid;
     private FrameLayout root;
     private WallpaperPlayer wallpaperPlayer;
+    /** Theme video_wall: the YouTube wall Home, or null for the usual dock and grid. */
+    private VideoWall videoWall;
+    private boolean wallAppLibrary;
+    private static final int WALL_PILLS = 5;
     private GlassView glass;
     private View ambient;
     private TextView heroName;
@@ -624,6 +633,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             boolean onTile = newF != null && newF.getId() == R.id.card;
             if (!onTile) hideGlass();
         });
+        if (cfg.videoWall) setUpVideoWall(cfg);
 
         packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
         packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
@@ -645,6 +655,62 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (savedInstanceState == null) openLauncherSettingsIfAsked(getIntent());
     }
 
+    /** video_wall: the YouTube wall replaces the dock and grid; the top bar and its clock stay, made smaller. */
+    private void setUpVideoWall(Config cfg) {
+        ((View) grid.getParent()).setVisibility(View.GONE);
+        hero.setVisibility(View.GONE);
+        ambient.setVisibility(View.GONE);
+        greeting.setVisibility(View.GONE);
+        findViewById(R.id.date).setVisibility(View.GONE);
+        // "02:39 pm", the marker on the digits' baseline: the stock am/pm TextClock hangs from the bottom of a
+        // 52sp clock and floats above a small one, and its locale text is "P. M.".
+        TextClock clock = findViewById(R.id.clock);
+        clock.setTextSize(22f);
+        clock.setFormat12Hour("hh:mm");
+        clock.setFormat24Hour("HH:mm");
+        findViewById(R.id.ampm).setVisibility(View.GONE);
+        TextView marker = new TextView(this);
+        marker.setTextSize(13f);
+        marker.setTextColor(0xCCFFFFFF);
+        marker.setTypeface(((TextView) findViewById(R.id.ampm)).getTypeface());
+        marker.setIncludeFontPadding(false);
+        LinearLayout.LayoutParams markerLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        markerLp.setMarginStart(Math.round(5 * density));
+        ViewGroup row = (ViewGroup) clock.getParent();
+        row.addView(marker, row.indexOfChild(clock) + 1, markerLp);
+        Runnable setMarker = () -> marker.setText(Landscapes.clockParts(this, new java.util.Date())[1]);
+        setMarker.run();
+        clock.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void afterTextChanged(android.text.Editable s) { setMarker.run(); }
+        });
+        videoWall = new VideoWall(this, root, root.indexOfChild(sky) + 1, animations && !reducedMotion, new VideoWall.Host() {
+            @Override public void openApp(String pkg) {
+                Intent i = getPackageManager().getLeanbackLaunchIntentForPackage(pkg);
+                if (i == null) i = getPackageManager().getLaunchIntentForPackage(pkg);
+                if (i != null) open(i);
+            }
+            @Override public void openLibrary() { onLibraryRequested(); }
+            @Override public View topButton() { return findViewById(R.id.btnSettings); }
+        });
+        wallAppLibrary = cfg.appLibrary;
+    }
+
+    /** The first apps of Home, in Home's order, as the wall's pills. */
+    private void updateWallApps() {
+        if (videoWall == null) return;
+        List<String> pkgs = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        for (int i = 0; i < adapter.appCount() && pkgs.size() < WALL_PILLS; i++) {
+            String pkg = adapter.packageAt(i);
+            if (pkg == null || pkgs.contains(pkg)) continue;
+            pkgs.add(pkg);
+            labels.add(adapter.labelAt(i));
+        }
+        videoWall.setApps(pkgs, labels, wallAppLibrary);
+    }
+
     private boolean openLauncherSettingsIfAsked(Intent intent) {
         if (intent == null || !ACTION_LAUNCHER_SETTINGS.equals(intent.getAction())) return false;
         setIntent(new Intent(Intent.ACTION_MAIN));
@@ -658,7 +724,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         YouTubeWallpapers.refreshIfDue(this, collectionChanged -> {
             if (isDestroyed()) return;
             if (collectionChanged) recreate();
-            else wallpaperPlayer.reloadCaptions();
+            else {
+                wallpaperPlayer.reloadCaptions();
+                if (videoWall != null) videoWall.reload();
+            }
         });
     }
 
@@ -672,6 +741,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         super.onNewIntent(intent);
         if (openLauncherSettingsIfAsked(intent)) return;
         if (intent == null || !intent.hasCategory(Intent.CATEGORY_HOME)) return;
+        if (videoWall != null) {
+            videoWall.home();
+            return;
+        }
         grid.scrollToPosition(0);
         lastFocused = 0;
         lastFocusedKey = adapter.getItemCount() > 0 ? adapter.keyAt(0) : null;
@@ -732,6 +805,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (showStats) startStats();
         sky.update();
         wallpaperPlayer.start();
+        if (videoWall != null) {
+            videoWall.resume();
+            Landscapes.refreshIfDue(this);
+        }
         refreshYouTubeWallpapers();
         handler.postDelayed(minuteTick, MINUTE_MS);
         if (festive && diya != null) {
@@ -811,6 +888,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         adapter.reload(cards.isEmpty() ? none : CardFeature.run(() -> Cards.shown(cards), none), leanback);
         lastFocusedKey = returnKey;
         lastFocused = returnSlot;
+        updateWallApps();
     }
 
     /**
@@ -848,6 +926,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         root.removeCallbacks(showIdleClock);
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
+        if (videoWall != null) videoWall.pause();
         stopAmbientAnimation();
         hero.animate().cancel();
         ambient.animate().cancel();
@@ -909,6 +988,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     protected void onDestroy() {
         super.onDestroy();
         wallpaperPlayer.close();
+        if (videoWall != null) videoWall.release();
         ConnectivityManager cm = getSystemService(ConnectivityManager.class);
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (tim != null) tim.unregisterCallback(inputCallback);
@@ -1217,7 +1297,16 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     public void onBackPressed() {
-        // Home screen: Back goes nowhere.
+        // Home screen: Back goes nowhere, except Back twice on the video wall, which opens Paisajes.
+        if (videoWall == null) return;
+        long now = SystemClock.uptimeMillis();
+        if (now - lastBackAt < DOUBLE_BACK_MS) {
+            lastBackAt = 0;
+            startActivity(new Intent(this, LandscapeActivity.class));
+            overridePendingTransition(android.R.anim.fade_in, 0);
+        } else {
+            lastBackAt = now;
+        }
     }
 
     // ---- glass highlight -------------------------------------------------------------------------
@@ -1951,6 +2040,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void focusTile(int position) {
         libraryFocusPending = false;
+        if (videoWall != null) {
+            videoWall.focus();
+            return;
+        }
         cancelPendingFocusScroll();
         if (adapter.appCount() == 0) {
             if (adapter.isLibraryAt(0)) focusLibrary();

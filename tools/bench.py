@@ -101,6 +101,9 @@ class TV:
 
     def home_component(self):
         """The component that answers HOME, e.g. com.gathin.tvhome/.MainActivity."""
+        # Google TV keeps HOME on launcherx when this launcher takes Home through HomeKeyService: name it here.
+        if os.environ.get("BENCH_COMPONENT"):
+            return os.environ["BENCH_COMPONENT"]
         out = self.shell(
             "cmd package resolve-activity --brief -a android.intent.action.MAIN "
             "-c android.intent.category.HOME")

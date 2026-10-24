@@ -150,6 +150,27 @@
             </intent-filter>
         </service>
 
+        <!-- "Paisajes" (fork, video_wall): Back twice on the wall, or the wall left idle. -->
+        <activity
+            android:name=".LandscapeActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
+        <!-- The same photos as the system screensaver: `settings put secure screensaver_components
+             com.gathin.tvhome/.LandscapeDream`. -->
+        <service
+            android:name=".LandscapeDream"
+            android:label="Paisajes"
+            android:exported="true"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
         <!-- tools/theme.sh writes the theme through this where the shell can't reach Android/data;
              see ThemeProvider. WRITE_SECURE_SETTINGS: the adb shell has it, ordinary apps don't. -->
         <provider

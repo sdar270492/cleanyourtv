@@ -1,0 +1,24 @@
+{
+  "video_wall": true,
+  "wallpaper": false,
+  "app_library": true,
+  "dock_apps": [
+    "com.google.android.youtube.tv",
+    "com.google.android.youtube.tvmusic",
+    "com.directv.dtvlatam",
+    "com.mediatek.wwtv.tvcenter",
+    "com.instantbits.cast.receiver"
+  ],
+  "live_tv_package": "com.mediatek.wwtv.tvcenter",
+  "stock_home_redirect": "com.google.android.apps.tv.launcherx",
+  "animations": true,
+  "advanced_effects": true,
+  "wallpaper_true_color": true,
+  "module_cards": false,
+  "app_labels": [
+    "com.directv.dtvlatam=DIRECTV GO",
+    "com.mediatek.wwtv.tvcenter=TV en vivo",
+    "com.instantbits.cast.receiver=Web Video Cast"
+  ],
+  "home_idle_clock_minutes": 10
+}

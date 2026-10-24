@@ -1,0 +1,43 @@
+# JVC 4K ISDB TV (built by KTC, device lavender, MediaTek m7332, Mali-G52, ~1.9 GB RAM), Peru
+# Google TV on Android 14, firmware UKNV.260610.001, security patch 2026-07-01. 4K panel, UI at 1920x1080 (320 dpi).
+# Same platform and firmware family as examples/jmgo-n1s-holan (m7332, UKNV.*).
+#
+# Apply:   TV_HOST=<tv ip> tools/disable.sh examples/jvc-ktc-lavender/debloat.txt
+# Undo:    TV_HOST=<tv ip> tools/restore.sh examples/jvc-ktc-lavender/debloat.txt
+# Everything is DISABLED, not uninstalled.
+#
+# Stock launcher:  com.google.android.apps.tv.launcherx (priority 2); setupwraith/.RecoveryActivity also claims HOME
+#                  (priority 1). Neither is disabled: on Google TV MOKA/Realtek sets that boot-loops, and nothing
+#                  here needs it. The launcher takes Home through HomeKeyService + stock_home_redirect.
+# Live TV app:     com.mediatek.wwtv.tvcenter
+# Never disable:   fusion.android.tv.demo (receives com.mstar.android.intent.action.TV_INPUT_BUTTON: the remote's
+#                  Input button), every com.ktc.*, com.mediatek.*, com.mstar.* and com.dolby.* package.
+# Kept by choice:  Assistant (katniss), Chromecast (mediashell), YouTube Music, ambient mode (dreamx), TalkBack.
+# Disabled before this list, so not listed: com.netflix.ninja, com.amazon.amazonvideo.livingroom.
+#
+# Quirks, checked on the TV:
+# - USB debugging alone already opens port 5555 on this firmware.
+# - `screencap -p` to stdout starts with a vendor line ("Init wrapper sys mutex successful"): write the PNG on the
+#   TV (`screencap -p /data/local/tmp/c.png`) and pull it.
+# - The load average reads ~56 at idle (kernel threads in D state); it is not CPU use.
+# - Each full-screen layer costs about a third of a frame on this GPU: a launcher that redraws the whole screen
+#   every frame (an animated wallpaper) should keep to one full-screen layer.
+
+# Content recognition (Anoki ACR: identifies what is on screen for ads)
+tv.anoki.acr.anokiacroptin
+
+# Telemetry
+com.android.tv.feedbackconsent
+
+# Android ad and personalisation services
+com.android.adservices.api
+com.android.ondevicepersonalization.services
+com.android.federatedcompute.services
+
+# Manufacturer rows and apps injected into the home screen
+com.mediatek.android.leanbacklauncher.partnercustomizer
+
+# Not needed on a TV
+com.android.healthconnect.controller
+com.android.health.connect.backuprestore
+com.google.android.play.games
